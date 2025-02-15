@@ -21,7 +21,7 @@ si mauvais WRITE | UNAUTHORIZED
 si bon WRITE | BEGIN est envoye par le serveur
 le serveur doit se preparer a recevoir un nouveau fichier txt quil doit mettre dans le dossier txt et mettre le nom dans le Files_List.txt
 
-- READ | jeton_client | ->
+- READ | jeton_client | nomFichier ->
 si mauvaise READ | UNAUTHORIZED
 si bon le serveur demande au client quel fichier pour read
 si le fichier est dans le serveur, il montre ce qui se trouve dans le fichier txt dans le dossier txt 
