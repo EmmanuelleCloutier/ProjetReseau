@@ -135,21 +135,22 @@ public class Server {
     private static class HandleClient extends Thread {
         private Socket clientSocket;
         private PrintWriter out;
-
+        private Scanner input;
+    
         public HandleClient(Socket socket){
             this.clientSocket = socket;
             try {
                 this.out = new PrintWriter(clientSocket.getOutputStream(), true);
+                this.input = new Scanner(clientSocket.getInputStream());
             } catch (IOException e) {
-                System.out.println("Erreur lors de l'initialisation de PrintWriter : " + e.getMessage());
+                System.out.println("Erreur lors de l'initialisation : " + e.getMessage());
             }
         }
-
+    
         public void run(){
             try {
                 System.out.println("Nouveau client connecté : " + clientSocket.getInetAddress());
     
-                Scanner input = new Scanner(clientSocket.getInputStream());
                 while (input.hasNextLine()) {
                     String message = input.nextLine();
                     System.out.println("Message reçu du client : " + message);
@@ -159,8 +160,10 @@ public class Server {
                         handleRegister(clientSocket.getInetAddress().toString());
                     } else if (parts.length == 2 && parts[0].equalsIgnoreCase("LS")) {
                         handleLS(parts[1]);
+                    } else if (parts.length == 2 && parts[0].equalsIgnoreCase("WRITE")) {
+                        handleWrite(parts[1]);
                     } else {
-                        out.println("Message reçu: " + message);
+                        out.println("Message inconnu: " + message);
                     }
                 }
     
@@ -203,8 +206,98 @@ public class Server {
                 out.println(fileList.toString());
             } catch (FileNotFoundException e) {
                 out.println("LS | ERROR | Cannot read file list");
-                System.out.println("Erreur de lecture du fichier Files_List.txt : " + e.getMessage());
             }
         }
+    
+        private void handleWrite(String token) {
+            if (!clients.containsKey(token)) {
+                out.println("WRITE | UNAUTHORIZED");
+                return;
+            }
+    
+            out.println("WRITE | BEGIN");
+    
+            try {
+                // Lire le nom du fichier
+                String fileName = input.nextLine();
+                System.out.println("Nom du fichier reçu : " + fileName);
+    
+                // Créer le dossier txt s'il n'existe pas
+                File dir = new File("txt");
+                if (!dir.exists()) {
+                    dir.mkdir();
+                }
+    
+                // Création du fichier
+                File file = new File("txt/" + fileName);
+                PrintWriter fileWriter = new PrintWriter(file);
+    
+                // Lire le contenu du fichier
+                while (input.hasNextLine()) {
+                    String line = input.nextLine();
+                    if (line.equals("WRITE | END")) {
+                        break;
+                    }
+                    fileWriter.println(line);
+                }
+    
+                fileWriter.close();
+                System.out.println("Fichier écrit : " + fileName);
+    
+                // Ajouter le nom du fichier dans Files_List.txt 
+                PrintWriter listWriter = new PrintWriter(new PrintWriter(new java.io.FileWriter("Files_List.txt", true)));
+                listWriter.println(fileName);
+                listWriter.close();
+    
+                out.println("WRITE | SUCCESS");
+
+                // Mise à jour des autres serveurs
+                for (String peer : peersActif) {
+                    try {
+                        String[] parts = peer.split(":");
+                        String peerIP = parts[0];
+                        int peerPort = Integer.parseInt(parts[1]);
+
+                        Socket peerSocket = new Socket(peerIP, peerPort);
+                        PrintWriter peerOut = new PrintWriter(peerSocket.getOutputStream(), true);
+
+                        // Envoi du fichier ajouté avec l'IP du serveur actuel
+                        peerOut.println("UPDATE_FILES_LIST | " + fileName + " | " + clientSocket.getLocalAddress().getHostAddress() + ":" + clientSocket.getLocalPort());
+                        
+                        peerOut.close();
+                        peerSocket.close();
+                    } catch (IOException e) {
+                        System.out.println("Erreur lors de l'envoi de la mise à jour à " + peer);
+                    }
+                }
+
+    
+            } catch (IOException e) {
+                out.println("WRITE | ERROR");
+                System.out.println("Erreur lors de l'écriture du fichier : " + e.getMessage());
+            }
+        }
+
+        private void handleUpdateFilesList(String message) {
+            String[] parts = message.split(" \\| ");
+            if (parts.length != 3) {
+                return;
+            }
+        
+            String fileName = parts[1];
+            String serverInfo = parts[2];
+        
+            try {
+                PrintWriter listWriter = new PrintWriter(new java.io.FileWriter("Files_List.txt", true));
+                listWriter.println(fileName + " | " + serverInfo);
+                listWriter.close();
+                System.out.println("Fichier mis à jour : " + fileName + " (ajouté par " + serverInfo + ")");
+            } catch (IOException e) {
+                System.out.println("Erreur lors de la mise à jour de Files_List.txt");
+            }
+        }
+        
+    }
+    
 }
 
