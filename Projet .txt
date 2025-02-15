@@ -1,0 +1,38 @@
+Serveur  
+gestion de demarage du serveur 
+- demander utilisateur le IP_server:port et le mettre dans Peers_list 
+- apres ca get un Peers.list pour avoir tous les autres serveurs connecté //threads 
+- envoyer ping a tous les autres peers pour savoir si la connection se fait //thread encore mais seulement si la peers_list change
+- une fois fait, faire un get Files_list.txt //threads
+- show la liste de fichier ainsique que le serveur responsable du fichier //threads si changement 
+
+gestion client au serveur
+- threads pour recevoir un client et leur envoye une connection reussi
+- le serveur donne un token au client seulement si il demande REGISTER 
+la reponse du serveur : REGISTERED | jeton_client 
+
+action que le client peut faire 
+- LS | jeton_client  -> 
+si le token nest pas bon LS | UNAUTHORIZED 
+si le token est bon le serveur envoit message LS | ok | nomfichier1 | nomfichier2 |.... 
+
+- WRITE | jeton_client | ->
+si mauvais WRITE | UNAUTHORIZED 
+si bon WRITE | BEGIN est envoye par le serveur
+le serveur doit se preparer a recevoir un nouveau fichier txt quil doit mettre dans le dossier txt et mettre le nom dans le Files_List.txt
+
+- READ | jeton_client | ->
+si mauvaise READ | UNAUTHORIZED
+si bon le serveur demande au client quel fichier pour read
+si le fichier est dans le serveur, il montre ce qui se trouve dans le fichier txt dans le dossier txt 
+
+si le fichier vient dun autre serveur, le serveur doit lui donner un 2e jeton 
+READ-REDIRECT | IP_AUTRE_SERVEIR | PORT_AUTRE_SERVEUR | jeton_redirectClient
+le client peut ensuite faire un READ |jeton_redirectClient mais qui va au serveur en question et ca passe 
+
+
+
+Peers_list : 
+IP_Server:port
+permet que notre serveur de base se connecte au autres serveurs 
+envoyer ping pour assurer que ca soit correct 
