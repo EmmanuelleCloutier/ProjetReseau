@@ -214,69 +214,39 @@ public class Server {
                 out.println("WRITE | UNAUTHORIZED");
                 return;
             }
-    
+        
             out.println("WRITE | BEGIN");
-    
+        
             try {
-                // Lire le nom du fichier
                 String fileName = input.nextLine();
-                System.out.println("Nom du fichier reçu : " + fileName);
-    
-                // Créer le dossier txt s'il n'existe pas
                 File dir = new File("txt");
                 if (!dir.exists()) {
                     dir.mkdir();
                 }
-    
-                // Création du fichier
+        
                 File file = new File("txt/" + fileName);
-                PrintWriter fileWriter = new PrintWriter(file);
-    
-                // Lire le contenu du fichier
-                while (input.hasNextLine()) {
-                    String line = input.nextLine();
-                    if (line.equals("WRITE | END")) {
-                        break;
+                try (PrintWriter fileWriter = new PrintWriter(file)) {
+                    while (input.hasNextLine()) {
+                        String line = input.nextLine();
+                        if (line.equals("WRITE | END")) {
+                            break;
+                        }
+                        fileWriter.println(line);
                     }
-                    fileWriter.println(line);
                 }
-    
-                fileWriter.close();
-                System.out.println("Fichier écrit : " + fileName);
-    
-                // Ajouter le nom du fichier dans Files_List.txt 
-                PrintWriter listWriter = new PrintWriter(new PrintWriter(new java.io.FileWriter("Files_List.txt", true)));
-                listWriter.println(fileName);
-                listWriter.close();
-    
+        
+                try (PrintWriter listWriter = new PrintWriter(new java.io.FileWriter("Files_List.txt", true))) {
+                    listWriter.println(fileName);
+                }
+        
                 out.println("WRITE | SUCCESS");
-
-                // Mise à jour des autres serveurs
-                for (String peer : peersActif) {
-                    try {
-                        String[] parts = peer.split(":");
-                        String peerIP = parts[0];
-                        int peerPort = Integer.parseInt(parts[1]);
-
-                        Socket peerSocket = new Socket(peerIP, peerPort);
-                        PrintWriter peerOut = new PrintWriter(peerSocket.getOutputStream(), true);
-
-                        // Envoi du fichier ajouté avec l'IP du serveur actuel
-                        peerOut.println("UPDATE_FILES_LIST | " + fileName + " | " + clientSocket.getLocalAddress().getHostAddress() + ":" + clientSocket.getLocalPort());
-                        
-                        peerOut.close();
-                        peerSocket.close();
-                    } catch (IOException e) {
-                        System.out.println("Erreur lors de l'envoi de la mise à jour à " + peer);
-                    }
-                }
-
-    
+        
             } catch (IOException e) {
                 out.println("WRITE | ERROR");
-                System.out.println("Erreur lors de l'écriture du fichier : " + e.getMessage());
+                e.printStackTrace();
             }
         }
+        
 
         private void handleUpdateFilesList(String message) {
             String[] parts = message.split(" \\| ");
