@@ -22,35 +22,36 @@ public class Client {
              BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
 
             System.out.println("Connecté au serveur");
-            
-            // Enregistrement du client
-            out.println("REGISTER");
-            String response = in.readLine();
-            if (response.startsWith("REGISTERED|")) {
-                clientToken = response.split("\\|")[1];
-                System.out.println("Enregistré avec le token: " + clientToken);
-            } else {
-                System.out.println("Erreur d'enregistrement: " + response);
-                return;
-            }
 
             while (true) {
                 System.out.println("\nOptions :");
-                System.out.println("1 - Lister les fichiers");
-                System.out.println("2 - Envoyer un fichier");
-                System.out.println("3 - Quitter");
+                System.out.println("1 - Register"); 
+                System.out.println("2 - Lister les fichiers");
+                System.out.println("3 - Envoyer un fichier");
+                System.out.println("4 - Quitter");
                 System.out.print("Votre choix: ");
                 int choice = scanner.nextInt();
                 scanner.nextLine();
 
                 switch (choice) {
-                    case 1:
+                    case 1: 
+                    out.println("REGISTER");
+                    String response = in.readLine();
+                    if (response.startsWith("REGISTERED|")) {
+                        clientToken = response.split("\\|")[1];
+                        System.out.println("Enregistré avec le token: " + clientToken);
+                    } else {
+                        System.out.println("Erreur d'enregistrement: " + response);
+                        return;
+                    }
+                    break;
+                    case 2:
                         listFiles(out, in);
                         break;
-                    case 2:
+                    case 3:
                         sendFile(out, in, scanner);
                         break;
-                    case 3:
+                    case 4:
                         System.out.println("Déconnexion...");
                         return;
                     default:
@@ -62,17 +63,18 @@ public class Client {
         }
     }
 
+
     private static void listFiles(PrintWriter out, BufferedReader in) throws IOException {
         out.println("LS | " + clientToken);
         String response = in.readLine();
         if (response.startsWith("LS | ok")) {
             System.out.println("Fichiers disponibles :");
-            String[] files = response.split(" \| ");
+            String[] files = response.split(" \n| ");
             for (int i = 2; i < files.length; i++) {
                 System.out.println("- " + files[i]);
             }
         } else {
-            System.out.println("Erreur : " + response);
+            System.out.println("LS | UNAUTHORIZED");
         }
     }
 

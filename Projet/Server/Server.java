@@ -6,8 +6,8 @@ import java.net.InetAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-import java.util.HasMap; 
 import java.util.Scanner;
 import java.util.UUID; 
 
@@ -79,34 +79,15 @@ public class Server {
         }
     }
 
-    public static void GetFileslist(){
-        try{
-            File file = new File("Files_List.txt");
-            Scanner reader = new Scanner(file);
-
-            while(reader.hasNextLine()){
-                String data = reader.nextLine();
-                System.out.println(data); 
-            }
-            reader.close();
-        } catch(FileNotFoundException e){
-            System.out.println("An error occured.");
-            e.printStackTrace();
-        }
-    }
-
     public static void Start(String host, int port){
         try (ServerSocket serverSocket = new ServerSocket(port, 5, InetAddress.getByName(host))) {
                 System.out.println("Serveur started on " + host + ":" + port);
 
-            //Thread pour handle les autres connection server et client 
+            //thread principal pour les clients  
             while (true){
                 try{
                     Socket socket = serverSocket.accept();
-                    SetPeersActif(); 
-                    GetFileslist(); 
                     new HandleClient(socket).start();
-
                 }catch (IOException e) {
                 System.out.println("Error de connexion");
             }}
@@ -116,6 +97,7 @@ public class Server {
         }
     }
 
+    //faire un start pour les serveurs 
     
     public static void main(String[] args) {
         
@@ -129,6 +111,7 @@ public class Server {
         int port = scanner.nextInt();
 
         System.out.println(ipAddress + " :" + port);
+        SetPeersActif(); 
         Start(ipAddress, port);
     }
 
