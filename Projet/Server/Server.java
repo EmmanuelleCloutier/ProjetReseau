@@ -7,6 +7,7 @@ import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -14,185 +15,147 @@ import java.util.UUID;
 
 public class Server {
 
-    private static List<String> peersActif = new ArrayList<>();
-    private static HashMap<String, String> clients = new HashMap<>();
+    private static final Map<String, String> clients = new HashMap<>();
+    private static final Map<String, String> fileLocations = new HashMap<>();
+    private static final List<String> activePeers = new ArrayList<>();
 
-    //pour avoir des connexion de serveur quand demande 
-    public static boolean ServerStart(String ipAddress, String port) {
-        int IPort = -1;
-
-        // String -> int
-        try{
-            IPort = Integer.parseInt(port);
-        }
-        catch (NumberFormatException ex){
-            System.out.println("Cannot convert : String -> int ");
-            ex.printStackTrace();
-            return false;
-        }
-
-        if(IPort == -1){
-            return false;
-        }
-
-        try (Socket socket = new Socket()){
-            socket.connect(new java.net.InetSocketAddress(ipAddress, IPort)); 
-            try {
-                socket.getOutputStream().write("Bienvenue sur le serveur !\n".getBytes());
-                socket.getOutputStream().flush();
-            } catch (IOException e) {
-                System.out.println("Impossible d'envoyer le message au serveur " + ipAddress + ":" + port);
-            }
-            return true; 
-        }
-        catch (IOException e) {
-            return false;  
-        }
-    }
-
-    public static void SetPeersActif() {
-        // Crée une HashMap pour stocker les pairs avec adresse IP et port
-        Map<String, Integer> peersActif = new HashMap<>();
-
-        try {
-            File Peers = new File("Peers_list.txt");
-            Scanner reader = new Scanner(Peers);
-
-            // Parcours chaque ligne du fichier
-            while (reader.hasNextLine()) {
-                String data = reader.nextLine();
-                System.out.println("Lecture de la ligne: " + data);
-
-                // Extraire l'adresse IP et le port de la chaîne
-                String ip = data.substring(0, data.indexOf(':'));
-                int port = Integer.parseInt(data.substring(data.indexOf(':') + 1));
-
-                // Ajoute l'adresse IP et le port dans la HashMap
-                peersActif.put(ip, port);
-                System.out.println("Ajouté au dictionnaire: " + ip + " -> " + port);
-            }
-            reader.close();
-
-        } catch (FileNotFoundException e) {
-            System.out.println("Un problème est survenu.");
-            e.printStackTrace();
-        }
-
-        // Affiche le dictionnaire des pairs
-        System.out.println("Dictionnaire des pairs : " + peersActif);
-    }
-
-    
-
-    //connexion des clients !thread principal 
-    public static void ClientStart(String host, int port){
-        try (ServerSocket serverSocket = new ServerSocket(port, 5, InetAddress.getByName(host))) {
-                System.out.println("Serveur started on " + host + ":" + port);
-
-            //thread principal pour les clients  
-            while (true){
-                try{
-                    Socket socket = serverSocket.accept();
-                    new HandleClient(socket).start();
-                }catch (IOException e) {
-                System.out.println("Error de connexion");
-            }}
-
-        } catch (IOException e) {
-            System.out.println("Error on start : " + e.getMessage());
-        }
-    }
-
-    //faire un start pour les serveurs 
-    
     public static void main(String[] args) {
-        
-        //Demander utilisateur marquer IP et port 
         Scanner scanner = new Scanner(System.in);
 
-        System.out.print("Veuillez entrer l'adresse IP du serveur de la machine: ");
+        System.out.print("Veuillez entrer l'adresse IP du serveur : ");
         String ipAddress = scanner.nextLine();
 
-        System.out.print("Veuillez entrer le port du serveur: ");
+        System.out.print("Veuillez entrer le port du serveur : ");
         int port = scanner.nextInt();
 
-        System.out.println(ipAddress + " :" + port);
-        //SetPeersActif(); 
-        ClientStart(ipAddress, port);
+        loadPeers();
+        loadFiles();
+        checkActivePeers();
+        startServer(ipAddress, port);
     }
 
-    private static class HandleClient extends Thread {
-        private Socket clientSocket;
-        private PrintWriter out;
-        private Scanner input;
-    
-        public HandleClient(Socket socket){
-            this.clientSocket = socket;
-            try {
-                this.out = new PrintWriter(clientSocket.getOutputStream(), true);
-                this.input = new Scanner(clientSocket.getInputStream());
+    // Charger les pairs
+    private static void loadPeers() {
+        try (Scanner scanner = new Scanner(new File("Peers_list.txt"))) {
+            while (scanner.hasNextLine()) {
+                String peer = scanner.nextLine().trim();
+                if (!peer.isEmpty()) activePeers.add(peer);
+            }
+        } catch (FileNotFoundException e) {
+            System.out.println("Fichier Peers_list.txt introuvable.");
+        }
+    }
+
+    // Charger les fichiers
+    private static void loadFiles() {
+        try (Scanner scanner = new Scanner(new File("Files_list.txt"))) {
+            while (scanner.hasNextLine()) {
+                String[] parts = scanner.nextLine().trim().split(" ");
+                String fileName = parts[0];
+                String location = (parts.length > 1) ? parts[1] : "LOCAL";
+                fileLocations.put(fileName, location);
+            }
+        } catch (FileNotFoundException e) {
+            System.out.println("Fichier Files_list.txt introuvable.");
+        }
+    }
+
+    // Vérifier les pairs actifs
+    private static void checkActivePeers() {
+        Iterator<String> iterator = activePeers.iterator();
+        while (iterator.hasNext()) {
+            String peer = iterator.next();
+            String[] parts = peer.split(":");
+            String ip = parts[0];
+            int port = Integer.parseInt(parts[1]);
+
+            try (Socket socket = new Socket(ip, port)) {
+                System.out.println("Peer actif : " + peer);
             } catch (IOException e) {
-                System.out.println("Erreur lors de l'initialisation : " + e.getMessage());
+                System.out.println("Peer inactif : " + peer);
+                iterator.remove();
             }
         }
-    
-        public void run(){
+    }
+
+    // Lancement du serveur
+    private static void startServer(String host, int port) {
+        try (ServerSocket serverSocket = new ServerSocket(port, 5, InetAddress.getByName(host))) {
+            System.out.println("Serveur démarré sur " + host + ":" + port);
+            while (true) {
+                Socket clientSocket = serverSocket.accept();
+                new ClientHandler(clientSocket).start();
+            }
+        } catch (IOException e) {
+            System.out.println("Erreur lors du démarrage : " + e.getMessage());
+        }
+    }
+
+    // Gestion des clients
+    private static class ClientHandler extends Thread {
+        private final Socket clientSocket;
+        private PrintWriter out;
+        private Scanner input;
+
+        public ClientHandler(Socket socket) {
+            this.clientSocket = socket;
+        }
+
+        public void run() {
             try {
+                out = new PrintWriter(clientSocket.getOutputStream(), true);
+                input = new Scanner(clientSocket.getInputStream());
+
                 System.out.println("Nouveau client connecté : " + clientSocket.getInetAddress());
-    
+
                 while (input.hasNextLine()) {
                     String message = input.nextLine();
-                    System.out.println("Message reçu du client : " + message);
-    
-                    String[] parts = message.split(" \\| ");
-                    if (parts.length == 1 && parts[0].equalsIgnoreCase("REGISTER")) {
-                        handleRegister(clientSocket.getInetAddress().toString());
-                    } else if (parts.length == 2 && parts[0].equalsIgnoreCase("LS")) {
-                        handleLS(parts[1]);
-                    } else if (parts.length == 2 && parts[0].equalsIgnoreCase("WRITE")) {
-                        handleWrite(parts[1]);  // Utilise la version complète de handleWrite
-                    } else if (parts.length == 2 && parts[0].equalsIgnoreCase("READ")) {
-                        handleRead(parts[1]);
-                    } else {
-                        out.println("Message inconnu: " + message);
-                    }
+                    System.out.println("Message reçu : " + message);
+                    handleMessage(message);
                 }
-    
+
                 input.close();
                 clientSocket.close();
                 System.out.println("Client déconnecté.");
+
             } catch (IOException e) {
                 System.out.println("Erreur avec un client : " + e.getMessage());
             }
         }
 
-        private void handleRegister(String clientAddress) {
-            String token = UUID.randomUUID().toString().replace("-", "").substring(0, 20);
-            clients.put(token, clientAddress);
-            out.println("REGISTERED|" + token + "|");
-            System.out.println("Client enregistré : " + clientAddress + " avec le jeton " + token);
+        private void handleMessage(String message) {
+            String[] parts = message.split("\\|");
+            switch (parts[0]) {
+                case "REGISTER":
+                    handleRegister();
+                    break;
+                case "LS":
+                    handleLS(parts[1]);
+                    break;
+                case "WRITE":
+                    handleWrite(parts[1]);
+                    break;
+                case "READ":
+                    handleRead(parts[1], parts[2]);
+                    break;
+                default:
+                    out.println("Message inconnu : " + message);
+            }
         }
 
-        // Vérifier si le jeton est valide et envoyer la liste des fichiers
+        private void handleRegister() {
+            String token = UUID.randomUUID().toString().replace("-", "").substring(0, 20);
+            clients.put(token, clientSocket.getInetAddress().toString());
+            out.println("REGISTERED|" + token + "|");
+            System.out.println("Client enregistré avec le jeton : " + token);
+        }
+
         private void handleLS(String token) {
             if (!clients.containsKey(token)) {
                 out.println("LS|UNAUTHORIZED");
                 return;
             }
-
-            File filesList = new File("Files_list.txt");
-            List<String> fileNames = new ArrayList<>();
-            try (Scanner scanner = new Scanner(filesList)) {
-                while (scanner.hasNextLine()) {
-                    String line = scanner.nextLine();
-                    fileNames.add(line);
-                }
-            } catch (FileNotFoundException e) {
-                out.println("LS|ERROR");
-                return;
-            }
-
-            out.println("LS|" + fileNames.size() + "|" + String.join("|", fileNames) + "|");
+            out.println("LS|" + fileLocations.keySet().size() + "|" + String.join("|", fileLocations.keySet()) + "|");
         }
 
         private void handleWrite(String token) {
@@ -200,49 +163,53 @@ public class Server {
                 out.println("WRITE|UNAUTHORIZED");
                 return;
             }
-
             out.println("WRITE|BEGIN");
-
-            try {
-                String fileName = input.nextLine();
-                File dir = new File("txt");
-                if (!dir.exists()) {
-                    dir.mkdir();
-                }
-
-                File file = new File("txt/" + fileName);
-                try (PrintWriter fileWriter = new PrintWriter(file)) {
-                    while (input.hasNextLine()) {
-                        String line = input.nextLine();
-                        if (line.equals("WRITE|END")) {
-                            break;
-                        }
-                        fileWriter.println(line);
-                    }
-                }
-
-                try (PrintWriter listWriter = new PrintWriter(new java.io.FileWriter("Files_List.txt", true))) {
-                    listWriter.println(fileName);
-                }
-
-                out.println("WRITE|SUCCESS");
-
-            } catch (IOException e) {
-                out.println("WRITE|ERROR");
-                e.printStackTrace(); 
-            }
         }
 
-        private void handleRead(String token) {
+        private void handleRead(String token, String fileName) {
             if (!clients.containsKey(token)) {
                 out.println("READ|UNAUTHORIZED");
                 return;
             }
-            out.println("READ|NOT_IMPLEMENTED");
+
+            if (!fileLocations.containsKey(fileName)) {
+                out.println("READ|NOT_FOUND");
+                return;
+            }
+
+            String location = fileLocations.get(fileName);
+            if (location.equals("LOCAL")) {
+                sendFile(fileName);
+            } else {
+                String[] parts = location.split(":");
+                String peerIp = parts[0];
+                String peerPort = parts[1];
+                out.println("READ-REDIRECT|" + peerIp + "|" + peerPort + "|" + token + "|");
+            }
         }
 
-        
-    }
-    
-}
+        private void sendFile(String fileName) {
+            File file = new File("txt/" + fileName);
+            if (!file.exists()) {
+                out.println("READ|ERROR");
+                return;
+            }
 
+            try (Scanner fileScanner = new Scanner(file)) {
+                int offset = 0;
+                while (fileScanner.hasNextLine()) {
+                    String content = fileScanner.nextLine();
+                    while (content.length() > 500) {
+                        out.println("FILE|" + fileName + "|" + offset + "|0|" + content.substring(0, 500));
+                        content = content.substring(500);
+                        offset++;
+                    }
+                    out.println("FILE|" + fileName + "|" + offset + "|1|" + content);
+                }
+                out.println("READ|END");
+            } catch (FileNotFoundException e) {
+                out.println("READ|ERROR");
+            }
+        }
+    }
+}
