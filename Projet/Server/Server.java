@@ -22,6 +22,7 @@ public class Server {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
+        System.out.print("Bienvenu!");
         System.out.print("Veuillez entrer l'adresse IP du serveur : ");
         String ipAddress = scanner.nextLine();
 
@@ -213,3 +214,5 @@ public class Server {
         }
     }
 }
+
+
