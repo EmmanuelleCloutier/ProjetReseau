@@ -27,8 +27,24 @@ public class Client {
             while (true) {
                 System.out.print("> ");
                 String command = scanner.nextLine().trim();
-
-                if (command.equalsIgnoreCase("register")) {
+            
+                // Si la commande contient un |, on l'envoie telle quelle
+                if (command.contains("|")) {
+                    out.println(command);
+            
+                    // Affichage de la réponse brute
+                    String response;
+                    while ((response = in.readLine()) != null) {
+                        System.out.println(response);
+                        // On s'arrête si on reçoit une fin de bloc
+                        if (response.equals("WRITE|BEGIN") || response.equals("READ|BEGIN") ||
+                            response.equals("WRITE|END") || response.equals("READ|END") ||
+                            response.startsWith("LS|") || response.startsWith("REGISTERED|") ||
+                            response.equals("WRITE|SUCCESS") || response.startsWith("READ|UNAUTHORIZED")) {
+                            break;
+                        }
+                    }
+                } else if (command.equalsIgnoreCase("register")) {
                     register(out, in);
                 } else if (command.equalsIgnoreCase("ls")) {
                     listFiles(out, in);
@@ -45,6 +61,7 @@ public class Client {
                     System.out.println("Commande inconnue. Commandes disponibles : register, ls, write <chemin>, read <fichier>, quit");
                 }
             }
+            
         } catch (IOException e) {
             System.out.println("Erreur de connexion au serveur : " + e.getMessage());
         }

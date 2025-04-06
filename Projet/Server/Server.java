@@ -162,8 +162,11 @@ public class Server {
                 out.println("LS|UNAUTHORIZED");
                 return;
             }
+        
             out.println("LS|" + fileLocations.keySet().size() + "|" + String.join("|", fileLocations.keySet()) + "|");
         }
+        
+        
 
         private void handleWrite(String token) {
             if (!clients.containsKey(token)) {
