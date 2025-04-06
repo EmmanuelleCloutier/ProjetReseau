@@ -3,9 +3,13 @@ import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.InetAddress;
+import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
@@ -31,7 +35,8 @@ public class Server {
 
         loadPeers();
         loadFiles();
-        checkActivePeers();
+        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
+        scheduler.scheduleAtFixedRate(() -> {checkActivePeers();}, 0, 5, TimeUnit.SECONDS); // toutes les 30 secondes
         startServer(ipAddress, port);
     }
 
@@ -62,23 +67,24 @@ public class Server {
     }
 
     // Vérifier les pairs actifs
-    private static void checkActivePeers() {
-        Iterator<String> iterator = activePeers.iterator();
-        while (iterator.hasNext()) {
-            String peer = iterator.next();
-            String[] parts = peer.split(":");
-            String ip = parts[0];
-            int port = Integer.parseInt(parts[1]);
+   private static void checkActivePeers() {
+    for (String peer : activePeers) {
+        String[] parts = peer.split(":");
+        String ip = parts[0];
+        int port = Integer.parseInt(parts[1]);
 
-            try (Socket socket = new Socket(ip, port)) {
-                System.out.println("Peer actif : " + peer);
-            } catch (IOException e) {
-                System.out.println("Peer inactif : " + peer);
-                iterator.remove();
-            }
+        try (Socket socket = new Socket()) {
+            socket.connect(new InetSocketAddress(ip, port), 5000); // 5 secondes de timeout
+            System.out.println("Peer actif : " + peer);
+        } catch (IOException e) {
+            System.out.println("Peer inactif : " + peer);
+            // Ne supprimer plus le peer de la liste, juste logguer l'inactivité
         }
     }
+}
 
+    
+    
     // Lancement du serveur
     private static void startServer(String host, int port) {
         try (ServerSocket serverSocket = new ServerSocket(port, 5, InetAddress.getByName(host))) {
