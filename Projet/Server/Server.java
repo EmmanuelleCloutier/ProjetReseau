@@ -1,3 +1,5 @@
+import java.io.BufferedReader;
+import java.io.InputStreamReader;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.IOException;
@@ -35,22 +37,22 @@ public class Server {
 
         loadPeers();
         loadFiles();
-        ScheduledExecutorService scheduler = Executors.newScheduledThreadPool(1);
-        scheduler.scheduleAtFixedRate(() -> {checkActivePeers();}, 0, 5, TimeUnit.SECONDS); // toutes les 30 secondes
         startServer(ipAddress, port);
     }
 
-    // Charger les pairs
-    private static void loadPeers() {
-        try (Scanner scanner = new Scanner(new File("Peers_list.txt"))) {
-            while (scanner.hasNextLine()) {
-                String peer = scanner.nextLine().trim();
-                if (!peer.isEmpty()) activePeers.add(peer);
+        // Charger les pairs depuis le fichier Peers_list.txt
+        private static void loadPeers() {
+            try (Scanner scanner = new Scanner(new File("Peers_list.txt"))) {
+                while (scanner.hasNextLine()) {
+                    String peer = scanner.nextLine().trim();
+                    if (!peer.isEmpty()) {
+                        activePeers.add(peer);
+                    }
+                }
+            } catch (FileNotFoundException e) {
+                System.out.println("Fichier Peers_list.txt introuvable.");
             }
-        } catch (FileNotFoundException e) {
-            System.out.println("Fichier Peers_list.txt introuvable.");
         }
-    }
 
     // Charger les fichiers
     private static void loadFiles() {
@@ -66,25 +68,6 @@ public class Server {
         }
     }
 
-    // Vérifier les pairs actifs
-   private static void checkActivePeers() {
-    for (String peer : activePeers) {
-        String[] parts = peer.split(":");
-        String ip = parts[0];
-        int port = Integer.parseInt(parts[1]);
-
-        try (Socket socket = new Socket()) {
-            socket.connect(new InetSocketAddress(ip, port), 5000); // 5 secondes de timeout
-            System.out.println("Peer actif : " + peer);
-        } catch (IOException e) {
-            System.out.println("Peer inactif : " + peer);
-            // Ne supprimer plus le peer de la liste, juste logguer l'inactivité
-        }
-    }
-}
-
-    
-    
     // Lancement du serveur
     private static void startServer(String host, int port) {
         try (ServerSocket serverSocket = new ServerSocket(port, 5, InetAddress.getByName(host))) {
@@ -181,22 +164,29 @@ public class Server {
                 out.println("READ|UNAUTHORIZED");
                 return;
             }
-
+        
+            // Vérifier si le fichier est dans la liste des fichiers
             if (!fileLocations.containsKey(fileName)) {
                 out.println("READ|NOT_FOUND");
+        
+                // Si le fichier n'est pas trouvé localement, vérifier les pairs
+                verifRedirectFile(fileName);
                 return;
             }
-
+        
+            // Si le fichier est local
             String location = fileLocations.get(fileName);
             if (location.equals("LOCAL")) {
-                sendFile(fileName);
+                sendFile(fileName); // Envoi direct du fichier
             } else {
+                // Si le fichier est distant, rediriger vers le pair
                 String[] parts = location.split(":");
                 String peerIp = parts[0];
                 String peerPort = parts[1];
                 out.println("READ-REDIRECT|" + peerIp + "|" + peerPort + "|" + token + "|");
             }
         }
+        
 
         private void sendFile(String fileName) {
             File file = new File("txt/" + fileName);
@@ -220,6 +210,50 @@ public class Server {
             } catch (FileNotFoundException e) {
                 out.println("READ|ERROR");
             }
+        }
+
+        private boolean canConnectToPeer(String peerIp, String peerPort) {
+            int port = Integer.parseInt(peerPort); // Convertir le port en entier
+    
+            try (Socket socket = new Socket()) {
+                // Tentative de connexion avec un délai d'attente
+                socket.connect(new InetSocketAddress(peerIp, port), 2000); // Timeout de 2 secondes
+                
+                // Si la connexion réussit
+                System.out.println("Connexion réussie au pair : " + peerIp + ":" + port);
+                return true;
+            } catch (IOException e) {
+                // Si la connexion échoue
+                System.out.println("Échec de la connexion au pair : " + peerIp + ":" + port + " - " + e.getMessage());
+                return false;
+            }
+        }
+        
+        private void verifRedirectFile(String fileName) {
+                    // Vérification des pairs dans le fichier Peers_list.txt
+            System.out.println("Vérification des pairs pour le fichier " + fileName);
+
+            // Recherche du fichier dans les pairs
+            for (String peer : activePeers) {
+                // Découper l'adresse IP et le port du pair
+                String[] parts = peer.split(":");
+                if (parts.length == 2) {
+                    String peerIp = parts[0];
+                    String peerPort = parts[1];
+
+                    // Vérifier si le serveur peut se connecter au pair avant de tenter de lui demander le fichier
+                    if (canConnectToPeer(peerIp, peerPort)) {
+                        // Si le pair est accessible, rediriger le client vers ce pair pour obtenir le fichier
+                        out.println("READ-REDIRECT|" + peerIp + "|" + peerPort + "|");
+                        return;  // Une fois la redirection effectuée, sortir de la méthode
+                    } else {
+                        System.out.println("Le pair " + peerIp + ":" + peerPort + " n'est pas accessible.");
+                    }
+                }
+            }
+
+            // Si aucun pair n'est accessible, renvoyer un message d'erreur
+            out.println("READ|NOT_FOUND_PEER");
         }
     }
 }

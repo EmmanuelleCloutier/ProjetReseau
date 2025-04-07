@@ -17,6 +17,16 @@ public class Client {
         serverPort = scanner.nextInt();
         scanner.nextLine(); // Consommer la ligne
 
+        try {
+            // Connexion au serveur principal
+            connectToServer(scanner);
+        } catch (IOException e) {
+            System.out.println("Erreur de connexion au serveur : " + e.getMessage());
+        }
+    }
+
+    // Fonction pour se connecter au serveur (et gérer les redirections)
+    private static void connectToServer(Scanner scanner) throws IOException {
         try (Socket socket = new Socket(serverIp, serverPort);
              PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
              BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
@@ -27,21 +37,37 @@ public class Client {
             while (true) {
                 System.out.print("> ");
                 String command = scanner.nextLine().trim();
-            
+
                 // Si la commande contient un |, on l'envoie telle quelle
                 if (command.contains("|")) {
                     out.println(command);
-            
+
                     // Affichage de la réponse brute
                     String response;
                     while ((response = in.readLine()) != null) {
                         System.out.println(response);
                         // On s'arrête si on reçoit une fin de bloc
                         if (response.equals("WRITE|BEGIN") || response.equals("READ|BEGIN") ||
-                            response.equals("WRITE|END") || response.equals("READ|END") ||
-                            response.startsWith("LS|") || response.startsWith("REGISTERED|") ||
-                            response.equals("WRITE|SUCCESS") || response.startsWith("READ|UNAUTHORIZED")) {
+                                response.equals("WRITE|END") || response.equals("READ|END") ||
+                                response.startsWith("LS|") || response.startsWith("REGISTERED|") ||
+                                response.equals("WRITE|SUCCESS") || response.startsWith("READ|UNAUTHORIZED")) {
                             break;
+                        }
+
+                        // Si redirection reçue, gérer la reconnexion au nouveau serveur
+                        if (response.startsWith("READ-REDIRECT|")) {
+                            String[] parts = response.split("\\|");
+                            String newIp = parts[1];
+                            int newPort = Integer.parseInt(parts[2]);
+                            System.out.println("Redirigé vers " + newIp + ":" + newPort);
+
+                            // Reconnexion au nouveau serveur
+                            serverIp = newIp;
+                            serverPort = newPort;
+
+                            // Reconnecter au nouveau serveur sans appeler main() à nouveau
+                            connectToServer(scanner);
+                            return; // Sortir de la méthode pour éviter la boucle infinie
                         }
                     }
                 } else if (command.equalsIgnoreCase("register")) {
@@ -61,9 +87,7 @@ public class Client {
                     System.out.println("Commande inconnue. Commandes disponibles : register, ls, write <chemin>, read <fichier>, quit");
                 }
             }
-            
-        } catch (IOException e) {
-            System.out.println("Erreur de connexion au serveur : " + e.getMessage());
+
         }
     }
 
@@ -164,7 +188,9 @@ public class Client {
             System.out.println("Redirigé vers " + newIp + ":" + newPort);
             serverIp = newIp;
             serverPort = newPort;
-            main(new String[0]); // Reconnexion au nouveau serveur
+
+            // Reconnecter au nouveau serveur sans appeler main() à nouveau
+            connectToServer(new Scanner(System.in)); // Reconnexion
         } else {
             System.out.println("Contenu du fichier :");
             while (true) {
