@@ -1,7 +1,10 @@
 import java.io.BufferedReader;
 import java.io.InputStreamReader;
+import java.io.OutputStreamWriter;
 import java.io.File;
+import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.net.InetAddress;
@@ -93,7 +96,7 @@ public class Server {
 
         public void run() {
             try {
-                out = new PrintWriter(clientSocket.getOutputStream(), true);
+                out = new PrintWriter(clientSocket.getOutputStream(),true);
                 input = new Scanner(clientSocket.getInputStream());
 
                 System.out.println("Nouveau client connecté : " + clientSocket.getInetAddress());
@@ -151,7 +154,7 @@ public class Server {
         
         
         private void saveFileList() {
-            try (PrintWriter writer = new PrintWriter("Files_list.txt")) {
+            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream("Files_list.txt"), "UTF-8"))) {
                 for (Map.Entry<String, String> entry : fileLocations.entrySet()) {
                     writer.println(entry.getKey() + " " + entry.getValue());
                 }
@@ -162,7 +165,7 @@ public class Server {
         
 
         private void saveFile(String fileName, Map<Integer, String> parts) {
-            try (PrintWriter writer = new PrintWriter("txt/" + fileName)) {
+            try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream("txt/" + fileName), "UTF-8"))) {
                 int offset = 0;
                 while (parts.containsKey(offset)) {
                     writer.println(parts.get(offset));
@@ -251,15 +254,14 @@ public class Server {
             }
         }
         
-
         private void sendFile(String fileName) {
             File file = new File("txt/" + fileName);
             if (!file.exists()) {
                 out.println("READ|ERROR");
                 return;
             }
-
-            try (Scanner fileScanner = new Scanner(file)) {
+        
+            try (Scanner fileScanner = new Scanner(new InputStreamReader(new FileInputStream(file), "UTF-8"))) {
                 int offset = 0;
                 while (fileScanner.hasNextLine()) {
                     String content = fileScanner.nextLine();
@@ -269,12 +271,14 @@ public class Server {
                         offset++;
                     }
                     out.println("FILE|" + fileName + "|" + offset + "|1|" + content);
+                    offset++;
                 }
                 out.println("READ|END");
-            } catch (FileNotFoundException e) {
+            } catch (IOException e) {
                 out.println("READ|ERROR");
             }
         }
+        
 
         private boolean canConnectToPeer(String peerIp, String peerPort) {
             int port = Integer.parseInt(peerPort); // Convertir le port en entier
