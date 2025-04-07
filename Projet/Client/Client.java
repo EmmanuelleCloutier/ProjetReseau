@@ -157,6 +157,7 @@ public class Client {
                     line = line.substring(500);
                 }
                 out.println(line);
+                System.out.println("Envoi de ligne: " + line);
             }
         }
         out.println("WRITE|END");

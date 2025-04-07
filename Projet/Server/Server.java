@@ -150,6 +150,68 @@ public class Server {
         }
         
         
+        private void saveFileList() {
+            try (PrintWriter writer = new PrintWriter("Files_list.txt")) {
+                for (Map.Entry<String, String> entry : fileLocations.entrySet()) {
+                    writer.println(entry.getKey() + " " + entry.getValue());
+                }
+            } catch (IOException e) {
+                System.out.println("Erreur lors de la mise à jour de Files_list.txt");
+            }
+        }
+        
+
+        private void saveFile(String fileName, Map<Integer, String> parts) {
+            try (PrintWriter writer = new PrintWriter("txt/" + fileName)) {
+                int offset = 0;
+                while (parts.containsKey(offset)) {
+                    writer.println(parts.get(offset));
+                    offset++;
+                }
+            } catch (IOException e) {
+                System.out.println("Erreur lors de la sauvegarde du fichier : " + e.getMessage());
+            }
+        }
+        
+        private void receiveFile() {
+            Map<Integer, String> fileParts = new HashMap<>();
+            String fileName = null;
+        
+            while (input.hasNextLine()) {
+                String line = input.nextLine();
+                if (line.equals("WRITE|END")) {
+                    break;
+                }
+        
+                if (line.startsWith("FILE|")) {
+                    String[] parts = line.split("\\|", 5);
+                    if (parts.length < 5) {
+                        out.println("WRITE|ERROR_FORMAT");
+                        return;
+                    }
+        
+                    fileName = parts[1];
+                    int offset = Integer.parseInt(parts[2]);
+                    int last = Integer.parseInt(parts[3]);
+                    String content = parts[4];
+        
+                    fileParts.put(offset, content);
+        
+                    if (last == 1) {
+                        break; // Fin de fichier
+                    }
+                }
+            }
+        
+            if (fileName != null) {
+                saveFile(fileName, fileParts);
+                fileLocations.put(fileName, "LOCAL");
+                saveFileList();
+                out.println("WRITE|SUCCESS");
+                System.out.println("Fichier '" + fileName + "' reçu et sauvegardé.");
+            }
+        }
+        
 
         private void handleWrite(String token) {
             if (!clients.containsKey(token)) {
@@ -157,7 +219,9 @@ public class Server {
                 return;
             }
             out.println("WRITE|BEGIN");
+            receiveFile(); // Appel pour recevoir les données de fichier
         }
+        
 
         private void handleRead(String token, String fileName) {
             if (!clients.containsKey(token)) {
