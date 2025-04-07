@@ -1,4 +1,3 @@
-import java.io.BufferedReader;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.File;
@@ -12,11 +11,7 @@ import java.net.InetSocketAddress;
 import java.net.ServerSocket;
 import java.net.Socket;
 import java.util.ArrayList;
-import java.util.concurrent.Executors;
-import java.util.concurrent.ScheduledExecutorService;
-import java.util.concurrent.TimeUnit;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Scanner;
@@ -24,13 +19,15 @@ import java.util.UUID;
 
 public class Server {
 
+    //maps pour stocker les clients enregistrées et les fichiers 
     private static final Map<String, String> clients = new HashMap<>();
     private static final Map<String, String> fileLocations = new HashMap<>();
     private static final List<String> activePeers = new ArrayList<>();
 
     public static void main(String[] args) {
-        Scanner scanner = new Scanner(System.in);
+        Scanner scanner = new Scanner(System.in); //pour les entrées de l'utilisateur
 
+        //recevoir adresseIP et port du serveur
         System.out.print("Bienvenu!");
         System.out.print("Veuillez entrer l'adresse IP du serveur : ");
         String ipAddress = scanner.nextLine();
@@ -38,24 +35,25 @@ public class Server {
         System.out.print("Veuillez entrer le port du serveur : ");
         int port = scanner.nextInt();
 
+        //charge le contenu dans le Peers_list et Files_list
         loadPeers();
         loadFiles();
         startServer(ipAddress, port);
     }
 
-        // Charger les pairs depuis le fichier Peers_list.txt
-        private static void loadPeers() {
-            try (Scanner scanner = new Scanner(new File("Peers_list.txt"))) {
-                while (scanner.hasNextLine()) {
-                    String peer = scanner.nextLine().trim();
-                    if (!peer.isEmpty()) {
-                        activePeers.add(peer);
-                    }
+    // Charger les peers 
+    private static void loadPeers() {
+        try (Scanner scanner = new Scanner(new File("Peers_list.txt"))) {
+            while (scanner.hasNextLine()) {
+                String peer = scanner.nextLine().trim();
+                if (!peer.isEmpty()) {
+                    activePeers.add(peer); 
                 }
-            } catch (FileNotFoundException e) {
-                System.out.println("Fichier Peers_list.txt introuvable.");
             }
+        } catch (FileNotFoundException e) {
+            System.out.println("Fichier Peers_list.txt introuvable.");
         }
+    }
 
     // Charger les fichiers
     private static void loadFiles() {
@@ -64,7 +62,7 @@ public class Server {
                 String[] parts = scanner.nextLine().trim().split(" ");
                 String fileName = parts[0];
                 String location = (parts.length > 1) ? parts[1] : "LOCAL";
-                fileLocations.put(fileName, location);
+                fileLocations.put(fileName, location);//stockage du fichier avec sa localisation 
             }
         } catch (FileNotFoundException e) {
             System.out.println("Fichier Files_list.txt introuvable.");
@@ -76,8 +74,8 @@ public class Server {
         try (ServerSocket serverSocket = new ServerSocket(port, 5, InetAddress.getByName(host))) {
             System.out.println("Serveur démarré sur " + host + ":" + port);
             while (true) {
-                Socket clientSocket = serverSocket.accept();
-                new ClientHandler(clientSocket).start();
+                Socket clientSocket = serverSocket.accept(); //attente dune connexion client
+                new ClientHandler(clientSocket).start(); //lancement dun thread pour gerer le client
             }
         } catch (IOException e) {
             System.out.println("Erreur lors du démarrage : " + e.getMessage());
@@ -86,14 +84,16 @@ public class Server {
 
     // Gestion des clients
     private static class ClientHandler extends Thread {
-        private final Socket clientSocket;
-        private PrintWriter out;
-        private Scanner input;
+        private final Socket clientSocket; //socket client
+        private PrintWriter out; //pour envoyer des messages
+        private Scanner input; //pour recevoir des messages 
 
+        //constructeur
         public ClientHandler(Socket socket) {
             this.clientSocket = socket;
         }
 
+        //quand le thread commence
         public void run() {
             try {
                 out = new PrintWriter(clientSocket.getOutputStream(),true);
@@ -104,7 +104,7 @@ public class Server {
                 while (input.hasNextLine()) {
                     String message = input.nextLine();
                     System.out.println("Message reçu : " + message);
-                    handleMessage(message);
+                    handleMessage(message); //gestion du message reçu
                 }
 
                 input.close();
@@ -116,6 +116,7 @@ public class Server {
             }
         }
 
+        //gestion des messages du client
         private void handleMessage(String message) {
             String[] parts = message.split("\\|");
             switch (parts[0]) {
@@ -136,6 +137,7 @@ public class Server {
             }
         }
 
+        //enrigistement du client et génération dun token unique
         private void handleRegister() {
             String token = UUID.randomUUID().toString().replace("-", "").substring(0, 20);
             clients.put(token, clientSocket.getInetAddress().toString());
@@ -143,6 +145,7 @@ public class Server {
             System.out.println("Client enregistré avec le jeton : " + token);
         }
 
+        //réponse pour le LS
         private void handleLS(String token) {
             if (!clients.containsKey(token)) {
                 out.println("LS|UNAUTHORIZED");
@@ -152,7 +155,8 @@ public class Server {
             out.println("LS|" + fileLocations.keySet().size() + "|" + String.join("|", fileLocations.keySet()) + "|");
         }
         
-        
+        //-------------------------- WRITE ----------------------------------------------
+        //sauvegarde des fichiers dans le fichier FILES_list.txt
         private void saveFileList() {
             try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream("Files_list.txt"), "UTF-8"))) {
                 for (Map.Entry<String, String> entry : fileLocations.entrySet()) {
@@ -163,7 +167,7 @@ public class Server {
             }
         }
         
-
+        //enrigistres les données dun fichier par des fragments 
         private void saveFile(String fileName, Map<Integer, String> parts) {
             try (PrintWriter writer = new PrintWriter(new OutputStreamWriter(new FileOutputStream("txt/" + fileName), "UTF-8"))) {
                 int offset = 0;
@@ -176,6 +180,7 @@ public class Server {
             }
         }
         
+        //recépection des données du WRITE
         private void receiveFile() {
             Map<Integer, String> fileParts = new HashMap<>();
             String fileName = null;
@@ -201,7 +206,7 @@ public class Server {
                     fileParts.put(offset, content);
         
                     if (last == 1) {
-                        break; // Fin de fichier
+                        break; 
                     }
                 }
             }
@@ -216,37 +221,38 @@ public class Server {
         }
         
 
+        //commande WRITE envoye par un client 
         private void handleWrite(String token) {
             if (!clients.containsKey(token)) {
                 out.println("WRITE|UNAUTHORIZED");
                 return;
             }
             out.println("WRITE|BEGIN");
-            receiveFile(); // Appel pour recevoir les données de fichier
+            receiveFile(); //reception du fichier
         }
         
-
+        //-------------------------------------- READ -------------------------------------------------------
         private void handleRead(String token, String fileName) {
             if (!clients.containsKey(token)) {
                 out.println("READ|UNAUTHORIZED");
                 return;
             }
         
-            // Vérifier si le fichier est dans la liste des fichiers
+            //vérifier si le fichier est dans la liste des fichiers
             if (!fileLocations.containsKey(fileName)) {
                 out.println("READ|NOT_FOUND");
         
-                // Si le fichier n'est pas trouvé localement, vérifier les pairs
+                //si le fichier n'est pas trouvé localement, vérifier les pairs
                 verifRedirectFile(fileName);
                 return;
             }
         
-            // Si le fichier est local
+            //si le fichier est local
             String location = fileLocations.get(fileName);
             if (location.equals("LOCAL")) {
                 sendFile(fileName); // Envoi direct du fichier
             } else {
-                // Si le fichier est distant, rediriger vers le pair
+                //rediriger vers le pair
                 String[] parts = location.split(":");
                 String peerIp = parts[0];
                 String peerPort = parts[1];
@@ -254,6 +260,7 @@ public class Server {
             }
         }
         
+        //envoie un fichier ligne par ligne 
         private void sendFile(String fileName) {
             File file = new File("txt/" + fileName);
             if (!file.exists()) {
@@ -279,39 +286,40 @@ public class Server {
             }
         }
         
-
+        //test la connection avec le pair selon la demande 
         private boolean canConnectToPeer(String peerIp, String peerPort) {
             int port = Integer.parseInt(peerPort); // Convertir le port en entier
     
             try (Socket socket = new Socket()) {
-                // Tentative de connexion avec un délai d'attente
+                //tente la connection avec un délai (lautre serveur doit etre active d'avance)
                 socket.connect(new InetSocketAddress(peerIp, port), 2000); // Timeout de 2 secondes
                 
-                // Si la connexion réussit
+                //connexion réussit
                 System.out.println("Connexion réussie au pair : " + peerIp + ":" + port);
                 return true;
             } catch (IOException e) {
-                // Si la connexion échoue
+                //connexion échoue
                 System.out.println("Échec de la connexion au pair : " + peerIp + ":" + port + " - " + e.getMessage());
                 return false;
             }
         }
         
+        //verifie la présence dun fichier chez les autres peers et rediriges si on peut
         private void verifRedirectFile(String fileName) {
-                    // Vérification des pairs dans le fichier Peers_list.txt
+                    //vérification des peers dans le fichier Peers_list.txt
             System.out.println("Vérification des pairs pour le fichier " + fileName);
 
-            // Recherche du fichier dans les pairs
+            //recherche du fichier dans les peers
             for (String peer : activePeers) {
-                // Découper l'adresse IP et le port du pair
+                //découper l'adresse IP et le port du peer
                 String[] parts = peer.split(":");
                 if (parts.length == 2) {
                     String peerIp = parts[0];
                     String peerPort = parts[1];
 
-                    // Vérifier si le serveur peut se connecter au pair avant de tenter de lui demander le fichier
+                    //vérifier si le serveur peut se connecter au peer avant de tenter de lui demander le fichier
                     if (canConnectToPeer(peerIp, peerPort)) {
-                        // Si le pair est accessible, rediriger le client vers ce pair pour obtenir le fichier
+                        //si le peer est accessible, rediriger le client vers ce peer pour obtenir le fichier
                         out.println("READ-REDIRECT|" + peerIp + "|" + peerPort + "|");
                         return;  // Une fois la redirection effectuée, sortir de la méthode
                     } else {
@@ -320,7 +328,7 @@ public class Server {
                 }
             }
 
-            // Si aucun pair n'est accessible, renvoyer un message d'erreur
+            // Si aucun peer n'est accessible, renvoyer un message d'erreur
             out.println("READ|NOT_FOUND_PEER");
         }
     }
