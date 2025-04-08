@@ -10,43 +10,43 @@ public class Client {
     public static void main(String[] args) {
         Scanner scanner = new Scanner(System.in);
 
-        // Demander l'adresse IP et le port au démarrage
+        //demander à l'utilisateur adresseIP et le port du serveur a se connecter 
         System.out.print("Veuillez entrer l'adresse IP du serveur : ");
         serverIp = scanner.nextLine();
         System.out.print("Veuillez entrer le port du serveur : ");
         serverPort = scanner.nextInt();
-        scanner.nextLine(); // Consommer la ligne
+        scanner.nextLine(); 
 
         try {
-            // Connexion au serveur principal
+            //connexion au serveur principal
             connectToServer(scanner);
         } catch (IOException e) {
             System.out.println("Erreur de connexion au serveur : " + e.getMessage());
         }
     }
 
-    // Fonction pour se connecter au serveur (et gérer les redirections)
+    //fonction qui gère la connexion et les interaction avec le serveur
     private static void connectToServer(Scanner scanner) throws IOException {
         try (Socket socket = new Socket(serverIp, serverPort);
-             PrintWriter out = new PrintWriter(socket.getOutputStream(), true);
-             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) {
+             PrintWriter out = new PrintWriter(socket.getOutputStream(), true); //pour envoyer des messages
+             BufferedReader in = new BufferedReader(new InputStreamReader(socket.getInputStream()))) { //pour recevoir des messages
 
             System.out.println("Connecté au serveur.");
 
-            // Boucle principale pour les commandes
+            //boucle principale pour les commandes
             while (true) {
                 System.out.print("> ");
                 String command = scanner.nextLine().trim();
 
-                // Si la commande contient un |, on l'envoie telle quelle
+                //si la commande contient un |, on l'envoie telle quelle
                 if (command.contains("|")) {
                     out.println(command);
 
-                    // Affichage de la réponse brute
+                    //lecture de la réponsse du serveur
                     String response;
                     while ((response = in.readLine()) != null) {
                         System.out.println(response);
-                        // On s'arrête si on reçoit une fin de bloc
+                        //on s'arrête si on reçoit une fin de bloc
                         if (response.equals("WRITE|BEGIN") || response.equals("READ|BEGIN") ||
                                 response.equals("WRITE|END") || response.equals("READ|END") ||
                                 response.startsWith("LS|") || response.startsWith("REGISTERED|") ||
@@ -54,20 +54,20 @@ public class Client {
                             break;
                         }
 
-                        // Si redirection reçue, gérer la reconnexion au nouveau serveur
+                        //si redirection reçue, gérer la reconnexion au nouveau serveur
                         if (response.startsWith("READ-REDIRECT|")) {
                             String[] parts = response.split("\\|");
                             String newIp = parts[1];
                             int newPort = Integer.parseInt(parts[2]);
                             System.out.println("Redirigé vers " + newIp + ":" + newPort);
 
-                            // Reconnexion au nouveau serveur
+                            //mise a jour des informations de connexion
                             serverIp = newIp;
                             serverPort = newPort;
 
-                            // Reconnecter au nouveau serveur sans appeler main() à nouveau
+                            //reconnexion au nouveau serveur
                             connectToServer(scanner);
-                            return; // Sortir de la méthode pour éviter la boucle infinie
+                            return; //sortir de la méthode pour éviter la boucle infinie
                         }
                     }
                 } else if (command.equalsIgnoreCase("register")) {
@@ -91,7 +91,7 @@ public class Client {
         }
     }
 
-    // Enregistrer le client
+    //enregistrer le client
     private static void register(PrintWriter out, BufferedReader in) throws IOException {
         out.println("REGISTER");
         String response = in.readLine();
@@ -103,7 +103,7 @@ public class Client {
         }
     }
 
-    // Lister les fichiers
+    //lister les fichiers
     private static void listFiles(PrintWriter out, BufferedReader in) throws IOException {
         if (clientToken == null) {
             System.out.println("Veuillez vous enregistrer d'abord.");
@@ -128,7 +128,7 @@ public class Client {
         }
     }
 
-    // Envoyer un fichier
+    //envoyer un fichier au serveur
     private static void sendFile(PrintWriter out, BufferedReader in, String filePath) throws IOException {
         if (clientToken == null) {
             System.out.println("Veuillez vous enregistrer d'abord.");
@@ -162,6 +162,7 @@ public class Client {
         }
         out.println("WRITE|END");
 
+        //verifie la réponse du serveur
         response = in.readLine();
         if (response.equals("WRITE|SUCCESS")) {
             System.out.println("Fichier envoyé avec succès.");
@@ -170,7 +171,7 @@ public class Client {
         }
     }
 
-    // Lire un fichier
+    //lire un fichier 
     private static void readFile(PrintWriter out, BufferedReader in, String fileName) throws IOException {
         if (clientToken == null) {
             System.out.println("Veuillez vous enregistrer d'abord.");
@@ -187,12 +188,14 @@ public class Client {
             String newIp = parts[1];
             int newPort = Integer.parseInt(parts[2]);
             System.out.println("Redirigé vers " + newIp + ":" + newPort);
+
+            //mise a jour de la connexion au nouveau serveur
             serverIp = newIp;
             serverPort = newPort;
+            connectToServer(new Scanner(System.in)); 
 
-            // Reconnecter au nouveau serveur sans appeler main() à nouveau
-            connectToServer(new Scanner(System.in)); // Reconnexion
         } else {
+            //affiche le contenu du fichier
             System.out.println("Contenu du fichier :");
             while (true) {
                 response = in.readLine();
