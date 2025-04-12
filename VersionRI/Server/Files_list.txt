@@ -1,0 +1,4 @@
+test.txt LOCAL
+bla.txt 172.16.14.34:2001
+essai1.txt LOCAL
+YOLOO.txt LOCAL
