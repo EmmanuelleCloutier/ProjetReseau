@@ -1,0 +1,6 @@
+Bonjour,
+Le code VersionRas fonctionne aussi Windows, mais les jar Windows ne fonctionne pas sur les Rasberry par des problèmes de versions. Donc je vous rend quand même les 2 versions au cas ou parce que c'est ça que Mikael nous a dit de faire dans le cours de laboratoire vendredi. 
+
+Emmanuelle Cloutier 
+Coralie Tremblay
+
